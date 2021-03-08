@@ -15,34 +15,73 @@
                 height: 400px;
             }
         </style>
+        <script src="/socket.io/socket.io.js"></script>
     </head>
     <body>
         <canvas id="screen" width="10" height="10"></canvas> <!-- desenha area do jogo -->
 
         <script type="module">
-            /*
-            npx serve         faz o git pode subir o servidor, não é o node
             
-            npm init         cria o servidor node
-            npm i express     adiciona modulo express ao node
-            nvm install node   atualiza pra versao recente do node
-            package.json:
-                "main": "server.js",    define o arquivo que é o backend
-                "type": "module",       define que o server é um modulo pra poder importar modulos
-            node server.js      sobe o servidor
-            npx nodemon      mesmo que npx serve mas do node (não precisa reiniciar servidor pra atualizary)
+            /*
+            Comando             Explicação
+            npx serve           Faz o gitpod pode subir um servidor temporário na internet
+            npm init            Cria um servidor node.js na pasta
+            npm i express       Adiciona modulo 'express' ao node
+            nvm install node    Atualiza para versão mais recente do node.js
+            node server.js      Sobe o servidor node (no arquivo package.json criado pelo node a variavel 'main'
+                                deve estar setada com o nome do arquvo que contém o servidor, no caso, 'server.js.
+                                Também, deve-se colocar a variável 'type' como 'module', para permitir que o node
+                                importe as funções e propriedas das Factorys)
+            npx nodemon         Sobe um servidor node.js que atualiza sem necessidade de reiniciar o servidor
+            npm i socket.io     Aadiciona o módulo de sockets para fazer a conexão entre clientes e servidor.
             */ 
 
             import createGame from './game.js'
             import createKeyboardListener from './keyboard-listener.js'
             import renderScreen from './render-screen.js'
-
-            const game = createGame() /* cria uma instancia do jogo */
+            
+            /*
+            Cria a intância do jogo que será executada no cliente
+            */
+            const game = createGame()
             const keyboardListener = createKeyboardListener(document) /* cria uma intancia do subject */
             keyboardListener.subscribe(game.movePlayer) /* inscreve a funcao movePLayer como um observer de keybordListener */
            
+            /*
+            Chamada da função recursiva que renderiza o jogo na tela do cliente
+            */
             const screen = document.getElementById('screen')
-            renderScreen(screen, game, requestAnimationFrame) /* função que rendeziza o jogo na tela */
+            renderScreen(screen, game, requestAnimationFrame)
+
+            /*
+            Conecta o cliente ao servidor
+            */
+            const socket = io()
+
+            /*
+            Quando o cliente conectar ao servidor
+            */
+            socket.on('connect', () => {
+                const playerId = socket.id
+                console.log(`Player conectado no cliente com id: ${playerId}`)
+            })
+
+            /* recebe game.state do servidor */
+            socket.on('setup', (state) => {
+                game.setState(state)
+            })
+
+            /* recebe comando de adicionar player do servidor */
+            socket.on('add-player', (command) => {
+                console.log(`Recebendo ${command.type} -> ${command.playerId}`)
+                game.addPlayer(command)
+            }) 
+
+            /* recebe comando de remover player do servidor */
+            socket.on('remove-player', (command) => {
+                console.log(`Recebendo ${command.type} -> ${command.playerId}`)
+                game.removePlayer(command)
+            }) 
       
         </script>
     </body>

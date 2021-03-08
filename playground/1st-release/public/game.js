@@ -1,7 +1,16 @@
-/* cria uma instancia (objeto) do jogo */
+/*
+Função que cria uma instancia (objeto) do jogo.
+Executa todos funções que alteram o jogo (adicionar, remover e mover jogadores e frutas).
+É uma Factory e também um Subject.
+*/
 export default function createGame() {
     
-    /* estrutura de dados que guarda as info do jogo */
+    /*
+    Estrutura de dados que guarda as informações do estado do jogo.
+    É uma representação abstrata da visualização do jogo.
+    Estrutura será enviada do servidor para os clientes para cada cliente construir a visualização do jogo.
+    Cada cliente irá alterar o jogo e enviará ao servidor um comando para ele alterar essa estrutura.
+    */
     const state = {
         players: {},
         fruits: {},
@@ -10,17 +19,64 @@ export default function createGame() {
             height: 10
         }
     }
+
+    /*
+    Array que contém todos Observers inscritos para receber notificação desse Subject 
+    Observers: Quando um jogador, no cliente, adicionar, remover ou mover um jogador ou fruta.
+    */
+    const observers = []
+
+    /*
+    Função, exposta pela Factory, a qual permite que um Observer se registre para receber notificações desse Subject.
+    O Observer vai registrar uma função que será executada quando o Subject for notifcar os Observers.
+    */
+    function subscribe(observerFunction) {  
+        observers.push(observerFunction)
+    }
+
+    /*
+    Função que notifica os Observers.
+    O Subject executa todas as funções cadastradas por todos Observers.
+    A funções são executadas recebendo o parâmetro 'command'.
+    */
+    function notifyAll(command) {
+        for (const observerFunction of observers){
+            observerFunction(command)
+        }
+    }
     
-    /* função que adiciona jogadore*/
+    /*
+    Função que recebe um novo estado do jogo, vindo do servidor, e atualiza o estado no cliente.
+    */
+    function setState(newState) {
+        Object.assign(state, newState)
+    }
+
+    /*
+    Função que adiciona um jogador.
+    É executada tanto no cliente como servidor.
+    */
     function addPlayer(command) {
         const playerId = command.playerId
-        const playerX = command.playerX
-        const playerY = command.playerY
+        const playerX = 'playerX' in command ? command.playerX : Math.floor(Math.random() * state.screen.width)
+        const playerY = 'playerY' in command ? command.playerY : Math.floor(Math.random() * state.screen.height)
 
         state.players[playerId] = {
             x: playerX,
             y: playerY
         }
+
+        /*
+        Quando um jogador for adicionado esse Subjec, no cliente, notifica o servidor.
+        Envia um comando de aadicionar player apara o servidor.
+        No servidor ele também adicionará um jogador no estado do jogo.
+        */
+        notifyAll({
+            type: 'add-player',
+            playerId: playerId,
+            playerX: playerX,
+            playerY, playerY
+        })
     }
 
     /* função que remove jogadores */
@@ -28,6 +84,12 @@ export default function createGame() {
         const playerId = command.playerId
 
         delete state.players[playerId]
+
+        /* quando remover player  o subject 'avisa' todos os observers */
+        notifyAll({
+            type: 'remove-player',
+            playerId: playerId
+        })
     }
 
         /* função que adiciona frutas*/
@@ -82,7 +144,7 @@ export default function createGame() {
         const player = state.players[command.playerId] /* seleciona o player que foi passado no comando */
         const moveFunction = acceptedMoves[keyPressed] /* acessa objeto passando a chave (tecla apertada) e pega o valor (função de movimento da tecla) */
         
-            /* executa a função de movimento correspondente a tecla apartada */
+        /* executa a função de movimento correspondente a tecla apartada */
         if (player && moveFunction) { /* verifica se existe o jogador e a função uma função para a tecla */
                 moveFunction(player)
                 checkForFruitCollision(playerId)
@@ -109,7 +171,9 @@ export default function createGame() {
         movePlayer, /* retorna a propriedade movePlayer do objeto jogo */
         addFruit,
         removeFruit,
-        state
+        setState,
+        state,
+        subscribe
     } 
 
 }
