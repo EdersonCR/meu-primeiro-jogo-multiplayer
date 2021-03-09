@@ -1,6 +1,7 @@
 /*
 Função que cria uma instancia (objeto) do jogo.
 Executa todos funções que alteram o jogo (adicionar, remover e mover jogadores e frutas).
+É executado tanto no cliente, como no servidor
 É uma Factory e também um Subject.
 */
 export default function createGame() {
@@ -27,8 +28,18 @@ export default function createGame() {
     const observers = []
 
     /*
+    Fnção que adiciona frutas ao jogo com uma determinada frequência
+    */
+    function start(){
+        const frequency = 3000
+
+        setInterval(addFruit, frequency)
+    }
+
+    /*
     Função, exposta pela Factory, a qual permite que um Observer se registre para receber notificações desse Subject.
     O Observer vai registrar uma função que será executada quando o Subject for notifcar os Observers.
+    Servidor vai inscrever uma função anônima que recebe um comando do jogo do servidor.
     */
     function subscribe(observerFunction) {  
         observers.push(observerFunction)
@@ -67,59 +78,98 @@ export default function createGame() {
         }
 
         /*
-        Quando um jogador for adicionado esse Subjec, no cliente, notifica o servidor.
-        Envia um comando de aadicionar player apara o servidor.
+        Quando um jogador for adicionado esse Subjec, notifica o servidor.
+        Envia um comando de adicionar player para o servidor.
         No servidor ele também adicionará um jogador no estado do jogo.
         */
         notifyAll({
             type: 'add-player',
             playerId: playerId,
             playerX: playerX,
-            playerY, playerY
+            playerY: playerY
         })
     }
 
-    /* função que remove jogadores */
+    /*
+    Função que remove um jogador.
+    Recebe como parâmentro um comando com a direção de movimento e o 'id' do jogador a ser movido.
+    */
     function removePlayer(command) {
         const playerId = command.playerId
 
         delete state.players[playerId]
 
-        /* quando remover player  o subject 'avisa' todos os observers */
+        /*
+        Envia para os Observers o comando do tipo 'remove-player' informado o id do jogador que desconectou.
+        */
         notifyAll({
             type: 'remove-player',
             playerId: playerId
         })
     }
 
-        /* função que adiciona frutas*/
+    /*
+    Função que adiciona frutas.
+    */
     function addFruit(command) {
-        const fruitId = command.fruitId
-        const fruitX = command.fruitX
-        const fruitY = command.fruitY
+        const fruitId = command ? command.fruitId : Math.floor(Math.random() * 1000000)
+        const fruitX = command ? command.fruitX : Math.floor(Math.random() * state.screen.width)
+        const fruitY = command ? command.fruitY : Math.floor(Math.random() * state.screen.height)
 
         state.fruits[fruitId] = {
             x: fruitX,
             y: fruitY
         }
+
+        /*
+        Quando uma fruta for adicionadoa esse Subjec, notifica o servidor.
+        Envia um comando de adicionar fruta para o servidor.
+        No servidor ele também adicionará uma fruta no estado do jogo.
+        */
+        notifyAll({
+            type: 'add-fruit',
+            fruitId: fruitId,
+            fruitX: fruitX,
+            fruitY: fruitY
+        })
     }
 
-    /* função que remove feutas */
+    /*
+    Função que remove frutas*/
     function removeFruit(command) {
         const fruitId = command.fruitId
-
         delete state.fruits[fruitId]
+
+       
+        /*
+        Envia para os Observers o comando do tipo 'remove-fruit' informado o id da fruta removida.
+        */
+        notifyAll({
+            type: 'remove-fruit',
+            fruitId: fruitId
+        })
     }
 
-    /* propriedade movePlayer é uma função que recebe um objeto (comando) que vem da camada de Input */
+    /*
+    Função que movimenta um jogador
+    Esta incrit pelo cliente como Obserever do 'keyBoardListener' e é executada no jogo do cliente quando uma tecla é aprtada pelo cliente
+    */
     function movePlayer(command) {
 
-        /* cria um objeto onde a chave é a tecla qeuserá apertada e o valor é a função que executa o movimento dessa tecla*/
+        /*
+        Envia para os Observers o comando do tipo 'ove-player' informado a tecla apertada e o 'id' do jogador que apertou.
+        */
+        notifyAll(command)
+
+        /* 
+        Cria um objeto chave: valor
+        Chave = Tecla que é apertada pelo cliente
+        Valor: FUnção que executa o movimento do jogador
+        */
         const acceptedMoves = {
             ArrowUp(player) {
                 if (player.y - 1 >= 0) {
                     player.y = player.y - 1
-                    return
                 }
             },
             ArrowDown(player) {
@@ -141,39 +191,51 @@ export default function createGame() {
 
         const keyPressed = command.keyPressed
         const playerId = command.playerId
-        const player = state.players[command.playerId] /* seleciona o player que foi passado no comando */
-        const moveFunction = acceptedMoves[keyPressed] /* acessa objeto passando a chave (tecla apertada) e pega o valor (função de movimento da tecla) */
+        const player = state.players[command.playerId]
+
+        /*
+        Acessa o objeto contendo as funções de movimento e recupera a função correspondente a tecla apertada
+        */
+        const moveFunction = acceptedMoves[keyPressed]
         
-        /* executa a função de movimento correspondente a tecla apartada */
-        if (player && moveFunction) { /* verifica se existe o jogador e a função uma função para a tecla */
+        /* 
+        Executa a função de movimento correspondente a tecla apartada
+        Verifica se o jogador existe se existe uma função de movimento associada a tecla apertada
+        */
+        if (player && moveFunction) {
                 moveFunction(player)
                 checkForFruitCollision(playerId)
         }
     }
 
+    /*
+    Função que verifica se houve uma colisão entre um jogador e uma fruta, casso ocorra, remove a fruta
+    */
     function checkForFruitCollision(playerId) {
         const player = state.players[playerId]
 
         for (const fruitId in state.fruits) {
             const fruit = state.fruits[fruitId]
-            console.log(`Checando ${playerId} e ${fruitId}`)
 
             if (player.x === fruit.x && player.y === fruit.y) {
-                console.log(`COLISÃO entre ${playerId} e ${fruitId}`)
                 removeFruit({ fruitId: fruitId })
             }
         }
     }
 
+    /*
+    Expõe as propriedades dessa factory que ficaram públicas para o cliente e para o servidor
+    */
     return {
         addPlayer,
         removePlayer,
-        movePlayer, /* retorna a propriedade movePlayer do objeto jogo */
+        movePlayer,
         addFruit,
         removeFruit,
         setState,
         state,
-        subscribe
+        subscribe,
+        start
     } 
 
 }

@@ -44,14 +44,11 @@
             Cria a intância do jogo que será executada no cliente
             */
             const game = createGame()
-            const keyboardListener = createKeyboardListener(document) /* cria uma intancia do subject */
-            keyboardListener.subscribe(game.movePlayer) /* inscreve a funcao movePLayer como um observer de keybordListener */
-           
+
             /*
-            Chamada da função recursiva que renderiza o jogo na tela do cliente
+            Cria uma intância do 'keyBoardListener que será executada no cliente'
             */
-            const screen = document.getElementById('screen')
-            renderScreen(screen, game, requestAnimationFrame)
+            const keyboardListener = createKeyboardListener(document)
 
             /*
             Conecta o cliente ao servidor
@@ -59,29 +56,100 @@
             const socket = io()
 
             /*
-            Quando o cliente conectar ao servidor
+            Quando o cliente se conectar ao servidor
             */
             socket.on('connect', () => {
                 const playerId = socket.id
                 console.log(`Player conectado no cliente com id: ${playerId}`)
+
+                /*
+                Chamada da função recursiva que renderiza o jogo na tela do cliente
+                Só renderiza depois que o cliente se conectar com sucesso com o servidor
+                */
+                const screen = document.getElementById('screen')
+                renderScreen(screen, game, requestAnimationFrame, playerId)
             })
 
-            /* recebe game.state do servidor */
+            /*
+            Recebe o estado do jogo do servidor e atualiza o jogo do cliente para sincronizar com o servidor
+            */
             socket.on('setup', (state) => {
+                const playerId = socket.id
                 game.setState(state)
+                console.log(`Setado jogo no cliente: ${playerId}`)
+
+                /*
+                Registra o 'id' do jogador no 'keyBoardListener' para que os comando de movimentos identifiquem o 'id' do jogador
+                */
+                keyboardListener.registerPlayerId(playerId)
+                
+                /*
+                Cliente se inscreve como Observer do 'keyBoardListener' rodado no cliente e excutar 'movePlayer quando for notificado'
+                Quando uma tecla for apertada pelo cliente, vai mover o jogador no jogo do cliente
+                */  
+                keyboardListener.subscribe(game.movePlayer)
+
+                /*
+                Cliente se inscreve como Observer do 'keyBoardListener' rodado no cliente e executar função pra emitir comando de movimento por servidor
+                Quando uma tecla for apertada pelo cliente, vai mover o jogador no jogo do servidor
+                */  
+                keyboardListener.subscribe((command) => {
+                    socket.emit('move-player', command)
+                })
+
+
             })
 
-            /* recebe comando de adicionar player do servidor */
+            /*
+            Recebe o comando do jogo do servidor de adicionar um novo jogador e adiciona no jogo do cliente
+            */
             socket.on('add-player', (command) => {
                 console.log(`Recebendo ${command.type} -> ${command.playerId}`)
                 game.addPlayer(command)
             }) 
 
-            /* recebe comando de remover player do servidor */
+            /*
+            Recebe o comando do jogo do servidor de remover um novo jogador e remve no jogo do cliente
+            */
             socket.on('remove-player', (command) => {
                 console.log(`Recebendo ${command.type} -> ${command.playerId}`)
                 game.removePlayer(command)
             }) 
+
+            /*
+            Recebe o comando do jogo do servidor de mover um jogador e  move esse jogador no jogo do cliente
+            */
+            socket.on('move-player', (command) => {
+                console.log(`Recebendo ${command.type} -> ${command.playerId}`)
+
+                const playerId = socket.id
+
+                /*
+                Verifica se 'id' do jogador do comando de mover jogador que chegou do servidor é diferente ao 'id' do jogador no cliente
+                Caso for, move o jogador no cliente
+                Caso contrário, não faz nada, pois o jogador já moveu quando enviou comando de movimento pro servidor 
+                */
+                if (playerId !== command.playerId){
+                    game.movePlayer(command)
+                }
+            })
+
+             /*
+            Recebe o comando do jogo do servidor de adicionar uma nova fruta o jogo do cliente
+            */
+            socket.on('add-fruit', (command) => {
+                console.log(`Recebendo ${command.type} -> ${command.fruitId}`)
+                game.addFruit(command)
+            }) 
+
+            /*
+            Recebe o comando do jogo do servidor de remover uma fruta o jogo do cliente
+            */
+            socket.on('remove-fruit', (command) => {
+                console.log(`Recebendo ${command.type} -> ${command.fruitId}`)
+                game.removeFruit(command)
+            }) 
+
       
         </script>
     </body>

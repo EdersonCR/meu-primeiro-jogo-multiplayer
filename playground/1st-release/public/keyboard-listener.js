@@ -1,43 +1,72 @@
- /* função que escuta o teclado e capitura a tecla apertada SUBJECT */ 
+ /*
+ Função que cria um objeto que capitura a tecla a apartada pelo jogador e notifica o jogo do cliente
+ É executada apenas no cliente
+ É uma Factory e também um Subject
+ */ 
 export default function createKeyboardListener(document) { 
     
-    /* array que contem todos observer inscritos */
+    /*
+    Array que contém todos Observers inscritos para receber notificação desse Subject 
+    Observers: Função de mover jogador no jogo do cliente.
+    */
     const state = {
-        observers: []
+        observers: [],
+        playerId: null
     }
 
-    /* funcao pela qual o observer se registra no subject (regsita uma função que será executada)*/
+    /*
+    Função que define o 'id' do jogador como sendo o 'id' do cliente
+    */
+    function registerPlayerId(playerId) {
+        state.playerId = playerId
+    }
+
+    /*
+    Função, exposta pela Factory, a qual permite que um Observer se registre para receber notificações desse Subject.
+    O Observer vai registrar uma função que será executada quando o Subject for notifcar os Observers.
+    O jogo do cliente vai inscrever a função de mover jogador no jogo
+    */
     function subscribe(observerFunction) {  
         state.observers.push(observerFunction)
     }
 
-    /* função pela qual o subject 'avisa' todos os observers quando acha necessario */
-    /* recebe o objeto comando que tem a tecla apertada */
+    /*
+    Função que notifica os Observers.
+    O Subject executa todas as funções cadastradas por todos Observers.
+    A funções são executadas recebendo o parâmetro 'command'.
+    Vai executar a função de mover jogador no jogo do cliente
+    */
     function notifyAll(command) {
-
-        /* itera todos observer e executas as funções dos observers passando o objeto comando */
         for (const observerFunction of state.observers){
             observerFunction(command)
         }
     }
 
-    document.addEventListener('keydown', handleKeydown) /* fica 'escurando' os inputs do TECLADO */
+    /*
+    Capitura a tecla aprtada no teclado
+    */
+    document.addEventListener('keydown', handleKeydown)
 
-    /* capitura o evento e realiza as ações */
+    /*
+    Função que cria o comando que será enviado para os Observers depois que uma tecla é apertada
+    Envia para os Observers o comando informado a tecla apertada e o 'id' do jogador que apertou
+    */
     function handleKeydown(event) {
         const keyPressed = event.key
-
-        /* cria objeto que envia info (tecla apertada) da camada de Input pra camada de Lógica */
-        const command = {
-            playerId: 'player1', 
+       
+        notifyAll({
+            type: 'move-player',
+            playerId: state.playerId, 
             keyPressed
-        }
-
-        notifyAll(command) /* notifica todos observer quando ouver tecla apertada */
+        })
     }
 
+    /*
+    Expõe as propriedades dessa Factory que ficaram públicas para o jogo no cliente
+    */
     return {
-        subscribe /* retorna a proprieda de inscrever um observer */
+        subscribe,
+        registerPlayerId
     }
 
 }
